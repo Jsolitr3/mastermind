@@ -85,7 +85,6 @@ class Game
     @exactCombos = []
     @gameOver = false
     @permutations = Array.new(4,[1,2,3,4,5,6])
-    end 
   end
   
   def getCode(role , arrayLength = 4, numberRange = 1..6)
@@ -164,11 +163,11 @@ class Game
   
   def validCode?(code)
     if code.length == 4 && code.all? {|number| (1..6).include?(number.to_i)}
-    return true
-  else
-    return false
+      return true
+    else
+      return false
+    end
   end
-end
 
   def cpuAlgo(exact, close, wrong, guess)
     tempCombos = @combos.values_at(0..-1)
