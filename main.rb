@@ -76,17 +76,33 @@ class Game
   include Math
   def initialize()
     @maxGuesses = 13
+    @combos = []
     [1, 2, 3, 4, 5, 6].repeated_permutation(4) {|combination| @combos.push(combination)}
     @turn = 0
     @guesses = Array.new() {Hash.new()}
     @invalidCombos = Array.new() {Array.new(4)}
     @win = false
+    @exactCombos = []
+    @gameOver = false
+    @permutations = Array.new(4,[1,2,3,4,5,6])
+    end 
   end
   
-  def generateCode(arrayLength = 4, numberRange = 1..6)
-    @secretCode = Array.new()
-    arrayLength.times do
-    @secretCode.push(rand(numberRange))
+  def getCode(role , arrayLength = 4, numberRange = 1..6)
+    @secretCode = []
+    code = []
+    output = "Please enter a combo for the computer to try to crack."
+    if role == "break"
+      arrayLength.times do
+      @secretCode.push(rand(numberRange))
+      end
+    elsif role == "make"
+      until validCode?(@secretCode) do
+        puts output
+        code = gets.chomp.split("")
+        code.each {|number| @secretCode.push(number.to_i)}
+        output = "Make sure your combo consists of 4 number each between 1 and 6."
+      end
     end
   end
   
@@ -95,22 +111,26 @@ class Game
       puts "Would you like to play as the code-maker or code-breaker?"
       userRole = gets.chomp.downcase
       if userRole.include?("make")
-        return"make"
+        @role = "make"
+        break
       elsif userRole.include?("break")
-        return "break"
+        @role = "break"
+        break
       end
     end
+    return @role
   end
-
+  
   def startGame()
     loop do
       initialize()
       displayRules()
-      userRole = getRole()
-      if userRole == "make"
-        makerGame
-      elsif userRole == "break"
-        breakerGame
+      getCode(getRole())
+      until @gameOver || @turn > 12 do
+        turnCount()
+        getGuess(@role == "break" ? "" : aiGuess())
+        checkGuess(@guesses[@guesses.length-1][:guess])
+        displayResult()
       end
       gameOver()
       unless playAgain?()
@@ -119,29 +139,82 @@ class Game
       end
     end
   end  
-
-  def userGuess()
-    puts "Try to break the computers secret code!"
-    loop do
-      guess = gets.chomp.split("")
-      if guess.length == 4
-        if guess.all? {|number| (1..6).include?(number.to_i)}
-          @guesses.push()
-          @guesses[@turn-1] = {
-            guessDisplay: Array.new(),
-            guess: Array.new()
-          }
-          guess.each { |num| @guesses[@turn-1][:guess].push(num.to_i)}
-          guess.each { |num| @guesses[@turn-1][:guessDisplay].push(CODECOLORS[num.to_i])}
-          break
+  
+  def aiGuess()
+    @guesses.push()
+    @guesses[@turn-1] = {
+      guessDisplay: Array.new(),
+      guess: Array.new()
+    }
+    if @turn == 1 then
+      return [1 ,1 ,2 ,2]
+    else
+      p @guesses[@turn-2][:guess]
+          
+      @combos.each do |code|
+        p code
+        if (code - @guesses[@turn-2][:guess]).length == 4
+          
+          return code
         end
-      end
-      puts "Please make sure your guess is 4 numbers ranging from 1 to 6."
+      end 
+      return @combos[rand(1..(@combos.length-1))]
     end
   end
   
+  def validCode?(code)
+    if code.length == 4 && code.all? {|number| (1..6).include?(number.to_i)}
+    return true
+  else
+    return false
+  end
+end
+
+  def cpuAlgo(exact, close, wrong, guess)
+    tempCombos = @combos.values_at(0..-1)
+    tempGuess = []
+    if wrong == 4
+      guess.repeated_permutation(4) {|combination| @combos.delete(combination)}
+    else
+      guess.repeated_permutation(close + exact) {|combination| tempGuess.push(combination)}
+      @combos.delete(guess)
+      @combos.keep_if do |code|
+        tempGuess.any? {|element| code.join("").include?(element.join(""))}
+      end
+      
+      # if exact == 0 
+      #   @exactCombos.push(guess)
+      # else
+      #end
+    end
+  end
+
+  def getGuess(guess = [])
+    if @role == "break"
+      output = "Try to break the computers secret code!"
+      until validCode?(guess) do
+        puts output
+        guess = gets.chomp.split("")
+        output = "Please make sure your guess is 4 numbers ranging from 1 to 6."
+      end
+    end
+    @guesses.push()
+    @guesses[@turn-1] = {
+      guessDisplay: Array.new(),
+      guess: Array.new()
+    }
+    guess.each { |num| @guesses[@turn-1][:guess].push(num.to_i)}
+    guess.each { |num| @guesses[@turn-1][:guessDisplay].push(CODECOLORS[num.to_i])}
+  end
+  
   def win()
+    if @role == "break"
       @win = true
+      @gameOver = true
+    elsif @role == "make"
+      @gameOver = true
+      @win = false
+    end
   end
 
   def checkGuess(guess)
@@ -157,7 +230,7 @@ class Game
       resultArr = Array.new()
       for i in (1..4)
         if tempguess[i-1] == tempArr[i-1]
-          puts i
+          exact += 1
           resultArr.push(RESULT[:exact])
           tempguess[i-1] = 0
           tempArr[i-1] = 0
@@ -166,6 +239,7 @@ class Game
         tempguess.each_with_index do |number, index|
           tempArr.each_with_index do |secretNumber, secretIndex|
             if number == secretNumber && number > 0
+              close += 1
               resultArr.push(RESULT[:close])
               tempArr[secretIndex] = 0
               tempguess[index] = 0
@@ -173,9 +247,12 @@ class Game
             end
           end
         end
-      wrong = 4 - resultArr.length
+      wrong = 4 - (exact + close)
       wrong.times do
         resultArr.push(RESULT[:wrong])
+      end
+      if @role == "make"
+        cpuAlgo(exact, close, wrong, guess)
       end
       @guesses[@turn-1][:result] = resultArr
     end
@@ -195,10 +272,14 @@ class Game
   end
 
   def gameOver()
-    if @win == true
+    if @win == true && @role == "break" && @gameOver == true
       puts bold("Congratulations! You Cracked the Code!")
-    else
-      puts bold("Better luck next time!")
+    elsif @win == false && @role == "make" && @gameOver == false
+      puts bold("Congratulation! The computer could not crack your code!")
+    elsif @win == false && @role =="break" && @gameOver == false
+      puts bold("You failed to crack the code. Better luck next time!")
+    elsif @win == false && @role =="make" && @gameOver == true
+      puts bold("The computer cracked your code. Better luck next time!")
     end
   end
 
@@ -213,21 +294,6 @@ class Game
     else
       return false
     end
-  end
-
-  def breakerGame()
-    generateCode()
-    until @win || @turn > 12 do
-    turnCount()
-    userGuess()
-    checkGuess(@guesses[@guesses.length-1][:guess])
-    displayResult()
-    end
-  end
-
-  def makerGame()
-    generateCode()
-
   end
 
 end
