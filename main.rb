@@ -297,3 +297,6 @@ end
   end
 
 end
+
+game1 = Game.new()
+game1.startGame()
