@@ -147,13 +147,9 @@ class Game
     }
     if @turn == 1 then
       return [1 ,1 ,2 ,2]
-    else
-      p @guesses[@turn-2][:guess]
-          
+    else          
       @combos.each do |code|
-        p code
         if (code - @guesses[@turn-2][:guess]).length == 4
-          
           return code
         end
       end 
