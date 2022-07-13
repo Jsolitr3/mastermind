@@ -80,11 +80,11 @@ class Game
     [1, 2, 3, 4, 5, 6].repeated_permutation(4) {|combination| @combos.push(combination)}
     @turn = 0
     @guesses = Array.new() {Hash.new()}
-    @invalidCombos = Array.new() {Array.new(4)}
     @win = false
-    @exactCombos = []
     @gameOver = false
+    @exactCombos = [0,0,0,0]
     @permutations = Array.new(4,[1,2,3,4,5,6])
+    @invalidCombos = Array.new() {Array.new(4)}
   end
   
   def getCode(role , arrayLength = 4, numberRange = 1..6)
@@ -168,6 +168,7 @@ class Game
   def cpuAlgo(exact, close, wrong, guess)
     tempCombos = @combos.values_at(0..-1)
     tempGuess = []
+    p "#{exact} #{close} #{wrong}"
     if wrong == 4
       guess.repeated_permutation(4) {|combination| @combos.delete(combination)}
     else
@@ -176,11 +177,13 @@ class Game
       @combos.keep_if do |code|
         tempGuess.any? {|element| code.join("").include?(element.join(""))}
       end
-      
-      # if exact == 0 
-      #   @exactCombos.push(guess)
-      # else
-      #end
+      if exact == 0
+        guess.each_with_index do |guessNumber, index|
+          @combos.delete_if do|comboNumber|
+            comboNumber[index] == guessNumber
+          end
+        end
+      end
     end
   end
 
